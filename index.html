@@ -128,7 +128,7 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
 .fphint .fpt{transition:opacity .4s}
 .fphint.mini .fpt{display:none}
 .fphint.mini{padding:4px 4px 4px 12px;gap:8px}
-@media (max-width:820px){body.fp .list,body.fp .brand,body.fp .detail,body.fp .wxstamp{display:none}body.fp .panel{max-height:none}
+@media (max-width:820px){body.fp .brand,body.fp .wxstamp{display:none}
 .fphint{top:14px;left:12px;right:auto;transform:none;font-size:11px;white-space:nowrap}
 .fphint .fpt{display:none}}
 .pclose,.fabs{display:none}
@@ -269,7 +269,7 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
 <article class="detail" id="detail" aria-live="polite"></article>
 <p class="wxstamp" id="wxstamp"></p>
 <div class="tip" id="tip"></div>
-<p class="credit">Elevación: Mapzen Terrarium (SRTM/EU-DEM) · Pueblos, cimas, ríos, carreteras y caminos: © colaboradores de OpenStreetMap (vía Overpass y Geofabrik) · <span id="build">compilado 23/09 18:02</span></p>
+<p class="credit">Elevación: Mapzen Terrarium (SRTM/EU-DEM) · Pueblos, cimas, ríos, carreteras y caminos: © colaboradores de OpenStreetMap (vía Overpass y Geofabrik) · <span id="build">compilado 23/09 18:06</span></p>
 
 <div class="load" id="load"><div><b>Montes de Navarra</b>Levantando el relieve…<i></i></div></div>
 
@@ -840,20 +840,32 @@ gpsBtn.addEventListener('click',()=>{
   },{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
 });
 // ---------- orientación del móvil → rumbo e inclinación ----------
-let orientOn=false, oYaw=null, oPitch=null, orientEvt=null;
+let orientOn=false, oYaw=null, oPitch=null, orientEvt=null, oRej=0;
 function screenAngle(){ return (screen.orientation&&screen.orientation.angle)||window.orientation||0; }
 function onOrient(e){
-  let heading=null;
-  if(typeof e.webkitCompassHeading==='number') heading=e.webkitCompassHeading;          // iOS
-  else if((e.absolute||e.type==='deviceorientationabsolute')&&e.alpha!=null) heading=(360-e.alpha)%360;   // Android
-  if(heading==null||e.beta==null) return;
-  const sa=screenAngle(); heading=(heading+sa+360)%360;
-  // inclinación: móvil vertical en retrato (beta≈90) = horizonte; en apaisado se usa gamma
-  let pitch = (sa===90||sa===-90||sa===270) ? (e.gamma<0 ? -(90+e.gamma) : 90-e.gamma) * (sa===90?1:-1) * -1 : e.beta-90;
-  pitch=Math.max(-70,Math.min(70,pitch));
-  const yaw=heading*Math.PI/180, pit=pitch*Math.PI/180;
-  if(oYaw==null){ oYaw=yaw; oPitch=pit; }
-  let d=yaw-oYaw; d=Math.atan2(Math.sin(d),Math.cos(d)); oYaw+=d*0.2; oPitch+=(pit-oPitch)*0.2;   // suavizado
+  if(e.alpha==null||e.beta==null||e.gamma==null) return;
+  const d2r=Math.PI/180, a=e.alpha*d2r, b=e.beta*d2r, g=e.gamma*d2r;
+  const cA=Math.cos(a),sA=Math.sin(a),cB=Math.cos(b),sB=Math.sin(b),cG=Math.cos(g),sG=Math.sin(g);
+  // dirección de la cámara trasera (eje −z del móvil) en coordenadas del mundo: x este, y norte, z arriba
+  const vx=-cA*sG-sA*sB*cG, vy=-sA*sG+cA*sB*cG, vz=-cB*cG;
+  const horiz=Math.hypot(vx,vy);
+  let heading;
+  if(typeof e.webkitCompassHeading==='number'&&e.webkitCompassHeading>=0){
+    // iOS: alpha no es absoluto; el rumbo de la brújula ya viene compensado por el sistema
+    heading=e.webkitCompassHeading;
+  } else if(e.absolute||e.type==='deviceorientationabsolute'){
+    if(horiz<0.15) return;                         // mirando casi en vertical: el rumbo no está definido
+    heading=(Math.atan2(vx,vy)/d2r+360)%360;
+  } else return;
+  heading=(heading+screenAngle()+360)%360;
+  const pitch=Math.max(-70*d2r,Math.min(70*d2r,Math.atan2(vz,horiz)));
+  const yaw=heading*d2r;
+  if(oYaw==null){ oYaw=yaw; oPitch=pitch; }
+  let d=yaw-oYaw; d=Math.atan2(Math.sin(d),Math.cos(d));
+  if(Math.abs(d)>2.6&&++oRej<6) return;             // descarta lecturas espurias de ~180°; si persisten, se aceptan
+  oRej=0;
+  const k=Math.abs(d)>0.35?0.25:0.1;               // suaviza el temblor, pero sigue rápido los giros grandes
+  oYaw+=d*k; oPitch+=(pitch-oPitch)*0.12;
   if(fp&&!flight&&!fpDrag){ fpYaw=oYaw; fpPitch=oPitch; fpAim(); }
 }
 async function startOrient(){
