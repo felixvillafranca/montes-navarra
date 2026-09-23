@@ -125,8 +125,12 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
 .fphint{position:fixed;left:50%;top:22px;transform:translateX(-50%);z-index:4;background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(224,58,46,.5);border-radius:999px;padding:8px 8px 8px 14px;font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:8px;white-space:nowrap}
 .fphint b{color:#f2a196;font-weight:600}
 .fphint .btn{padding:5px 9px;font-size:11px}
-@media (max-width:820px){body.fp .list,body.fp .brand p,body.fp .detail{display:none}body.fp .panel{max-height:none}
-.fphint{top:auto;bottom:calc(38vh + 60px);font-size:11px;white-space:normal;left:12px;right:12px;transform:none;border-radius:8px}}
+.fphint .fpt{transition:opacity .4s}
+.fphint.mini .fpt{display:none}
+.fphint.mini{padding:4px 4px 4px 12px;gap:8px}
+@media (max-width:820px){body.fp .list,body.fp .brand,body.fp .detail,body.fp .wxstamp{display:none}body.fp .panel{max-height:none}
+.fphint{top:14px;left:12px;right:auto;transform:none;font-size:11px;white-space:nowrap}
+.fphint .fpt{display:none}}
 /* compass */
 .compass{position:fixed;right:24px;top:118px;z-index:3;width:64px;appearance:none;border:0;background:transparent;padding:0;cursor:pointer;color:var(--ink-2);text-align:center}
 .compass svg{width:64px;height:64px;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
@@ -227,7 +231,7 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
     </form></div>
   <nav class="list" id="list"></nav>
 </section>
-<div class="fphint" id="fpHint" hidden><b>Modo mirador</b> · arrastra o mueve el móvil para mirar alrededor · rueda para acercar · <button class="btn" id="fpExit" type="button">Salir</button></div>
+<div class="fphint" id="fpHint" hidden><b>Mirador</b><span class="fpt"> · arrastra o mueve el móvil para mirar alrededor · rueda para acercar ·</span> <button class="btn" id="fpExit" type="button">Salir</button></div>
 <button class="compass" id="compass" type="button" title="Orientar al norte" aria-label="Brújula: pulsa para orientar al norte">
   <svg viewBox="0 0 64 64" aria-hidden="true">
     <circle class="ring" cx="32" cy="32" r="29"/>
@@ -243,7 +247,7 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
 <article class="detail" id="detail" aria-live="polite"></article>
 <p class="wxstamp" id="wxstamp"></p>
 <div class="tip" id="tip"></div>
-<p class="credit">Elevación: Mapzen Terrarium (SRTM/EU-DEM) · Pueblos, cimas, ríos, carreteras y caminos: © colaboradores de OpenStreetMap (vía Overpass y Geofabrik) · <span id="build">compilado 23/09 17:32</span></p>
+<p class="credit">Elevación: Mapzen Terrarium (SRTM/EU-DEM) · Pueblos, cimas, ríos, carreteras y caminos: © colaboradores de OpenStreetMap (vía Overpass y Geofabrik) · <span id="build">compilado 23/09 17:57</span></p>
 
 <div class="load" id="load"><div><b>Montes de Navarra</b>Levantando el relieve…<i></i></div></div>
 
@@ -771,7 +775,7 @@ vpForm.addEventListener('submit',e=>{   // formulario manual: solo aparece si el
 let fp=false, fpDrag=null, fpYaw=0, fpPitch=0;
 const fpHint=document.getElementById('fpHint');
 function enterFP(){
-  if(fp) return; fp=true; controls.enabled=false; fpHint.hidden=false; document.body.classList.add('fp');
+  if(fp) return; fp=true; controls.enabled=false; fpHint.hidden=false; fpHint.classList.remove('mini'); clearTimeout(fpHint._t); fpHint._t=setTimeout(()=>fpHint.classList.add('mini'),4000); document.body.classList.add('fp');
   const f=new THREE.Vector3().subVectors(controls.target,camera.position); fpYaw=Math.atan2(f.x,-f.z); fpPitch=Math.atan2(f.y,Math.hypot(f.x,f.z));
 }
 function exitFP(){ if(!fp) return; fp=false; document.body.classList.remove('fp'); if(orientOn) stopOrient(); controls.enabled=true; fpHint.hidden=true; camera.fov=42; camera.updateProjectionMatrix(); }
