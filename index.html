@@ -131,6 +131,22 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
 @media (max-width:820px){body.fp .list,body.fp .brand,body.fp .detail,body.fp .wxstamp{display:none}body.fp .panel{max-height:none}
 .fphint{top:14px;left:12px;right:auto;transform:none;font-size:11px;white-space:nowrap}
 .fphint .fpt{display:none}}
+.pclose,.fabs{display:none}
+@media (max-width:820px){
+  .panel.collapsed{display:none}
+  .pclose{display:block;position:absolute;top:6px;right:8px;z-index:2;appearance:none;border:0;background:transparent;color:var(--ink-3);font:300 24px/1 var(--body);width:34px;height:34px;border-radius:50%;cursor:pointer}
+  .panel .search{padding-right:44px}
+  .panel{max-height:62vh}
+  .fabs{display:flex;flex-direction:column;gap:10px;position:fixed;left:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:5}
+  .panel:not(.collapsed)~.fabs{display:none}
+  .fab{appearance:none;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--ink);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+  .fab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+  .fab.on{background:#e03a2e;border-color:#e03a2e;color:#fff}
+  .detail.detail{left:70px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));width:auto;max-height:46vh;overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch}
+  .detail h3{font-size:19px;margin:4px 0}
+  .detail .stats b{font-size:16px}
+  .detail .close{position:sticky;float:right;top:0}
+}
 /* compass */
 .compass{position:fixed;right:24px;top:118px;z-index:3;width:64px;appearance:none;border:0;background:transparent;padding:0;cursor:pointer;color:var(--ink-2);text-align:center}
 .compass svg{width:64px;height:64px;display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
@@ -215,7 +231,8 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
 
 <aside class="hint"><b>Arrastra</b> para girar · <b>Rueda</b> para acercar<br><b>Botón derecho</b> o dos dedos para desplazar<br><b>Doble clic</b> en el mapa para bajar a ese punto<br>Al acercarte aparecen pueblos, calles, pistas y senderos<br><button class="btn home" id="homeBtn" type="button">Ver toda Navarra</button></aside>
 
-<section class="panel" aria-label="Montes y pueblos">
+<section class="panel" id="panel" aria-label="Montes y pueblos">
+  <button class="pclose" id="pclose" type="button" aria-label="Recoger el buscador">×</button>
   <div class="search"><input id="q" type="search" placeholder="Buscar monte o pueblo…" autocomplete="off" aria-label="Buscar monte o pueblo">
     <div class="filters"><button class="chip" id="onlyNav" type="button" aria-pressed="true" style="--c:#e03a2e"><i></i>Solo Navarra</button><span class="fnote" id="fnote"></span></div>
     <div class="gps">
@@ -244,10 +261,15 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
   </svg>
   <span id="heading">N · 0°</span>
 </button>
+<div class="fabs" id="fabs">
+  <button class="fab" id="fabSearch" type="button" aria-label="Buscar monte o pueblo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg></button>
+  <button class="fab" id="fabGps" type="button" aria-label="Mi posición"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+  <button class="fab" id="fabOrient" type="button" aria-label="Girar con el móvil" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M3 9a9 9 0 0 0 0 6M21 9a9 9 0 0 1 0 6"/></svg></button>
+</div>
 <article class="detail" id="detail" aria-live="polite"></article>
 <p class="wxstamp" id="wxstamp"></p>
 <div class="tip" id="tip"></div>
-<p class="credit">Elevación: Mapzen Terrarium (SRTM/EU-DEM) · Pueblos, cimas, ríos, carreteras y caminos: © colaboradores de OpenStreetMap (vía Overpass y Geofabrik) · <span id="build">compilado 23/09 17:57</span></p>
+<p class="credit">Elevación: Mapzen Terrarium (SRTM/EU-DEM) · Pueblos, cimas, ríos, carreteras y caminos: © colaboradores de OpenStreetMap (vía Overpass y Geofabrik) · <span id="build">compilado 23/09 18:02</span></p>
 
 <div class="load" id="load"><div><b>Montes de Navarra</b>Levantando el relieve…<i></i></div></div>
 
@@ -571,6 +593,7 @@ function goTo(i){
   selLabel=LABEL_BY_KEY[i.lon+','+i.lat]||null; if(selLabel) selLabel.el.classList.add('sel');
 }
 function showCard(i){
+  collapsePanel();
   const [x,z,u,v]=toWorld(i.lon,i.lat);
   detailEl.style.setProperty('--c',i.kind==='peak'?'#e9dcc3':'#ece6d8');
   detailEl.innerHTML=i.kind==='peak'
@@ -793,7 +816,7 @@ const gpsBtn=document.getElementById('gpsBtn'), orientBtn=document.getElementByI
 const EYE_M=15;   // metros sobre el suelo en tu posición
 let gpsWatch=null;
 function stopGPS(){ if(gpsWatch!=null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; } gpsBtn.classList.remove('live'); }
-function gpsFail(msg){ stopGPS(); note(msg+' Puedes introducir las coordenadas a mano:',true); vpForm.hidden=false; }
+function gpsFail(msg){ stopGPS(); if(typeof panelEl!=='undefined') panelEl.classList.remove('collapsed'); note(msg+' Puedes introducir las coordenadas a mano:',true); vpForm.hidden=false; }
 function placeAtGPS(lat,lon,first){
   const [x,z,u,v]=toWorld(lon,lat);
   if(u<0||u>1||v<0||v>1){ gpsFail(`Estás en ${lat.toFixed(3)}, ${lon.toFixed(3)}, fuera del mapa (de Vitoria a Pau, de Tudela a la costa).`); return false; }
@@ -802,6 +825,7 @@ function placeAtGPS(lat,lon,first){
   return true;
 }
 gpsBtn.addEventListener('click',()=>{
+  collapsePanel();
   if(gpsWatch!=null){ stopGPS(); note('Seguimiento de posición detenido.'); return; }
   if(!('geolocation' in navigator)){ gpsFail('Este navegador no da la posición.'); return; }
   if(!window.isSecureContext){ gpsFail('La posición solo funciona en páginas https.'); return; }
@@ -845,6 +869,20 @@ async function startOrient(){
 function stopOrient(){ if(orientEvt) removeEventListener(orientEvt,onOrient); orientOn=false; orientBtn.setAttribute('aria-pressed','false'); }
 orientBtn.addEventListener('click',()=>{ orientOn?stopOrient():startOrient(); });
 if(!('DeviceOrientationEvent' in window)||!matchMedia('(pointer:coarse)').matches) orientBtn.remove();   // sin sensores (escritorio)
+// ---------- panel recogido en el móvil ----------
+const panelEl=document.getElementById('panel'), fabGps=document.getElementById('fabGps'), fabOrient=document.getElementById('fabOrient');
+const narrow=()=>matchMedia('(max-width:820px)').matches;
+function collapsePanel(){ if(narrow()) panelEl.classList.add('collapsed'); }
+if(narrow()) panelEl.classList.add('collapsed');
+document.getElementById('fabSearch').addEventListener('click',()=>{ panelEl.classList.remove('collapsed'); setTimeout(()=>qEl.focus(),50); });
+document.getElementById('pclose').addEventListener('click',collapsePanel);
+fabGps.addEventListener('click',()=>{ gpsBtn.click(); syncFabs(); });
+fabOrient.addEventListener('click',()=>{ orientBtn.click(); setTimeout(syncFabs,300); });
+function syncFabs(){
+  fabGps.classList.toggle('on',gpsBtn.classList.contains('live')||gpsWatch!=null);
+  const ob=document.getElementById('orientBtn'); fabOrient.hidden=!ob||ob.hidden; fabOrient.classList.toggle('on',!!ob&&ob.getAttribute('aria-pressed')==='true');
+}
+setInterval(syncFabs,800);
 // ---------- compass ----------
 const roseEl=document.getElementById('rose'), headEl=document.getElementById('heading');
 let lastHead=-1;
