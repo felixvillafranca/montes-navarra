@@ -136,7 +136,8 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
   .panel.collapsed{display:none}
   .pclose{display:block;position:absolute;top:6px;right:8px;z-index:2;appearance:none;border:0;background:transparent;color:var(--ink-3);font:300 24px/1 var(--body);width:34px;height:34px;border-radius:50%;cursor:pointer}
   .panel .search{padding-right:44px}
-  .panel{max-height:62vh}
+  .panel.panel{top:calc(10px + env(safe-area-inset-top));bottom:auto;left:10px;right:10px;max-height:var(--vvh,70vh);z-index:7}
+  body.search-open .brand,body.search-open .fphint,body.search-open .compass,body.search-open .detail{display:none}
   .fabs{display:flex;flex-direction:column;gap:10px;position:fixed;left:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:5}
   .panel:not(.collapsed)~.fabs{display:none}
   .fab{appearance:none;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--ink);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.45)}
@@ -269,7 +270,7 @@ body{margin:0;background:var(--ground) radial-gradient(120% 90% at 55% 40%,#1a24
 <article class="detail" id="detail" aria-live="polite"></article>
 <p class="wxstamp" id="wxstamp"></p>
 <div class="tip" id="tip"></div>
-<p class="credit">Elevación: Mapzen Terrarium (SRTM/EU-DEM) · Pueblos, cimas, ríos, carreteras y caminos: © colaboradores de OpenStreetMap (vía Overpass y Geofabrik) · <span id="build">compilado 23/09 18:06</span></p>
+<p class="credit">Elevación: Mapzen Terrarium (SRTM/EU-DEM) · Pueblos, cimas, ríos, carreteras y caminos: © colaboradores de OpenStreetMap (vía Overpass y Geofabrik) · <span id="build">compilado 23/09 18:10</span></p>
 
 <div class="load" id="load"><div><b>Montes de Navarra</b>Levantando el relieve…<i></i></div></div>
 
@@ -545,7 +546,8 @@ function buildUI(){
   buildLabels();
   renderList('');
   if(WX&&WX.valid_utc){ document.getElementById('wxstamp').innerHTML=`Al elegir una cima se muestran sus condiciones <b>GEFS</b> · instantánea del ${wxStamp()}`; }
-  qEl.addEventListener('input',()=>renderList(qEl.value.trim()));
+  let lastQ=null; const onQ=()=>{ const v=qEl.value.trim(); if(v!==lastQ){ lastQ=v; renderList(v); listEl.scrollTop=0; } };
+  ['input','keyup','change','compositionend','search'].forEach(ev=>qEl.addEventListener(ev,onQ));
   qEl.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const first=listEl.querySelector('.row'); if(first) first.click(); } });
 }
 function renderList(q){
@@ -816,7 +818,7 @@ const gpsBtn=document.getElementById('gpsBtn'), orientBtn=document.getElementByI
 const EYE_M=15;   // metros sobre el suelo en tu posición
 let gpsWatch=null;
 function stopGPS(){ if(gpsWatch!=null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; } gpsBtn.classList.remove('live'); }
-function gpsFail(msg){ stopGPS(); if(typeof panelEl!=='undefined') panelEl.classList.remove('collapsed'); note(msg+' Puedes introducir las coordenadas a mano:',true); vpForm.hidden=false; }
+function gpsFail(msg){ stopGPS(); if(typeof panelEl!=='undefined'){ panelEl.classList.remove('collapsed'); document.body.classList.add('search-open'); } note(msg+' Puedes introducir las coordenadas a mano:',true); vpForm.hidden=false; }
 function placeAtGPS(lat,lon,first){
   const [x,z,u,v]=toWorld(lon,lat);
   if(u<0||u>1||v<0||v>1){ gpsFail(`Estás en ${lat.toFixed(3)}, ${lon.toFixed(3)}, fuera del mapa (de Vitoria a Pau, de Tudela a la costa).`); return false; }
@@ -884,9 +886,12 @@ if(!('DeviceOrientationEvent' in window)||!matchMedia('(pointer:coarse)').matche
 // ---------- panel recogido en el móvil ----------
 const panelEl=document.getElementById('panel'), fabGps=document.getElementById('fabGps'), fabOrient=document.getElementById('fabOrient');
 const narrow=()=>matchMedia('(max-width:820px)').matches;
-function collapsePanel(){ if(narrow()) panelEl.classList.add('collapsed'); }
+function collapsePanel(){ if(narrow()){ panelEl.classList.add('collapsed'); document.body.classList.remove('search-open'); qEl.blur(); } }
+// altura útil real (descuenta el teclado en iOS y Android)
+function fitPanel(){ const vv=window.visualViewport; const h=(vv?vv.height:innerHeight)-20; document.documentElement.style.setProperty('--vvh',Math.max(200,h)+'px'); }
+if(window.visualViewport){ visualViewport.addEventListener('resize',fitPanel); visualViewport.addEventListener('scroll',fitPanel); } fitPanel();
 if(narrow()) panelEl.classList.add('collapsed');
-document.getElementById('fabSearch').addEventListener('click',()=>{ panelEl.classList.remove('collapsed'); setTimeout(()=>qEl.focus(),50); });
+document.getElementById('fabSearch').addEventListener('click',()=>{ panelEl.classList.remove('collapsed'); document.body.classList.add('search-open'); fitPanel(); listEl.scrollTop=0; qEl.focus(); });
 document.getElementById('pclose').addEventListener('click',collapsePanel);
 fabGps.addEventListener('click',()=>{ gpsBtn.click(); syncFabs(); });
 fabOrient.addEventListener('click',()=>{ orientBtn.click(); setTimeout(syncFabs,300); });
