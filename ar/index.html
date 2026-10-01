@@ -35,6 +35,21 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--ground);color:va
 .k5{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .k5 b{display:block;font:500 14px/1.1 var(--display);font-variant-numeric:tabular-nums;white-space:nowrap}
 .k5 span{font-size:10px;color:var(--ink-3)}
+.combo{display:block;width:100%;height:auto;overflow:visible}
+.combo .g{stroke:rgba(236,230,216,.08)}.combo .base{stroke:var(--line)}
+.combo .zero{stroke:var(--sky);stroke-dasharray:3 3;opacity:.7}.combo .zt{fill:var(--sky);font:9px var(--body)}
+.combo .band{fill:#f2c98a;fill-opacity:.16}.combo .ln{fill:none;stroke:#f2c98a;stroke-width:1.8}
+.combo circle{fill:#f2c98a}
+.combo .tv{fill:var(--ink);font:600 11px var(--body);font-variant-numeric:tabular-nums}
+.combo .td{fill:var(--ink-3);font-weight:400;font-size:9.5px}
+.combo .pb{fill:#7fb6e6}
+.combo .pl{fill:#a9cbe8;font:9.5px var(--body);font-variant-numeric:tabular-nums}
+.combo .hl{fill:var(--ink-2);font:600 9.5px var(--body)}
+.combo .mid{stroke:var(--ink-3);stroke-dasharray:2 3}.combo .midt{fill:var(--ink-3);font:italic 9px var(--body)}
+.combo .hm{fill:var(--ink-3);font:9px var(--body);font-variant-numeric:tabular-nums}
+.legend{margin:0!important;font-size:10px!important;color:var(--ink-3)!important;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px}
+.legend .lt{background:#f2c98a}.legend .lp{background:#7fb6e6;height:8px;width:6px;margin-left:6px}
 .tc{display:block;width:100%;height:58px}
 .tc .g{stroke:var(--line)}.tc .zero{stroke:var(--sky);stroke-dasharray:3 3;opacity:.7}
 .tc .band{fill:#f2c98a;fill-opacity:.16}.tc .ln{fill:none;stroke:#f2c98a;stroke-width:1.6}
@@ -277,33 +292,48 @@ const fmtValid=iso=>new Date(iso).toLocaleString('es-ES',{weekday:'short',day:'n
 // w = {t,ws,wd,g,p1,cloud,code,pp:[[h,prob,med,p90]…],trend:{hours,med,lo?,hi?,base}}
 function snapToW(s){
   const r=WX&&WX.peaks&&WX.peaks[s.pi]; if(!r||r.length<25) return null;
-  const pp=[[6,7],[12,10],[18,13],[24,16]].map(([h,k])=>[h,r[k],r[k+1],r[k+2]]);
-  return {t:r[0],ws:r[1],wd:r[2],g:r[3],p1:r[4],cloud:r[5],code:r[6],pp,trend:{hours:[0,...WX.trend_hours],med:[r[0],...r.slice(19,19+WX.trend_hours.length)],base:WX.valid_utc}};
+  const cum=[0,r[8],r[11],r[14],r[17]], blocks=[0,1,2,3].map(i=>({med:Math.max(0,cum[i+1]-cum[i]),prob:null}));
+  return {t:r[0],ws:r[1],wd:r[2],g:r[3],p1:r[4],cloud:r[5],code:r[6],blocks,trend:{hours:[0,...WX.trend_hours],med:[r[0],...r.slice(19,19+WX.trend_hours.length)],base:WX.valid_utc}};
 }
 function snapBlock(s){ const w=snapToW(s); return w?wxHTML(w,'instantánea GEFS · '+fmtValid(WX.valid_utc)+' · consultando el dato actual…'):'<p class="wxn">Consultando el tiempo GEFS…</p>'; }
 function wxHTML(w,src){
   const arrow=`<i class="wa" style="transform:rotate(${(w.wd+180)%360}deg)"></i>`;
   let h=`<div class="wx"><div class="k"><div><b>${fmtT(w.t)}</b><span>temperatura</span></div><div><b>${w.ws}<small> km/h</small>${arrow}</b><span>viento ${rumbo(w.wd)}</span></div><div><b>${w.g}<small> km/h</small></b><span>racha</span></div></div>
   <div class="k"><div><b class="sm">${WMO[w.code]||'—'}</b><span>cielo</span></div><div><b>${w.cloud}<small> %</small></b><span>nubosidad</span></div><div><b>${mm(w.p1)}<small> mm</small></b><span>última hora</span></div></div>`;
-  h+=trendHTML(w.trend);
-  h+=`<table class="pp"><thead><tr><th>Próximas</th><th>Prob. ≥1 mm</th><th>Mediana</th><th>Techo</th></tr></thead><tbody>${w.pp.map(([hh,pr,me,p9])=>`<tr><td>${hh} h</td><td><span class="bar"><i style="width:${pr}%"></i></span>${pr} %</td><td>${mm(me)} mm</td><td>${mm(p9)} mm</td></tr>`).join('')}</tbody></table>`;
+  h+=comboHTML(w);
   if(w.t<=1.5) h+='<p class="wxn snow">Con esta temperatura la precipitación caería en forma de nieve.</p>'; else if(w.t<=3) h+='<p class="wxn snow">Temperatura cercana a 0 °C: posible aguanieve.</p>';
   return h+`<p class="wxn">${src}</p></div>`;
 }
-function trendHTML(tr){
-  if(!tr||tr.med.length<3) return '';
+function comboHTML(w){
+  const tr=w.trend; if(!tr||tr.med.length<3) return '';
   const at=hh=>{ const i=tr.hours.indexOf(hh); if(i>=0) return tr.med[i]; for(let j=1;j<tr.hours.length;j++) if(tr.hours[j]>=hh){ const a=tr.hours[j-1],b=tr.hours[j]; return tr.med[j-1]+(tr.med[j]-tr.med[j-1])*(hh-a)/(b-a); } return tr.med[tr.med.length-1]; };
-  const base=tr.base?new Date(tr.base):null, hm=hh=>base?new Date(base.getTime()+hh*36e5).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'+'+hh+' h';
+  const base=tr.base?new Date(tr.base):null, hm=hh=>base?new Date(base.getTime()+hh*36e5).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
   const next=hh=>base&&new Date(base.getTime()+hh*36e5).getDate()!==base.getDate();
   const d6=at(6)-tr.med[0], word=d6<=-2?'bajando':d6>=2?'subiendo':'estable';
-  const delta=hh=>{ const d=Math.round(at(hh))-Math.round(tr.med[0]); return d===0?'(=)':`(${d>0?'+':'−'}${Math.abs(d)})`; };
-  const cells=[0,6,12,18,24].map(hh=>`<div><b>${fmtT(at(hh))}${hh?` <small>${delta(hh)}</small>`:''}</b><span>${hh?hm(hh)+(next(hh)?' mañana':''):'ahora'}</span></div>`).join('');
-  const Wd=300,Hd=58,L=26,Rr=4,T=6,B=14, all=[...tr.med,...(tr.lo||[]),...(tr.hi||[])], lo=Math.floor(Math.min(...all))-1, hi=Math.ceil(Math.max(...all))+1;
-  const X=hh=>L+hh/24*(Wd-L-Rr), Y=v=>T+(1-(v-lo)/(hi-lo))*(Hd-T-B);
+  const T=[0,6,12,18,24];
+  const Wd=320,L=20,R=300, X=hh=>L+hh/24*(R-L);
+  // temperatura (franja superior)
+  const all=[...tr.med,...(tr.lo||[]),...(tr.hi||[])], lo=Math.floor(Math.min(...all))-1, hi=Math.ceil(Math.max(...all))+1, ty0=26, ty1=74;
+  const Y=v=>ty0+(1-(v-lo)/(hi-lo))*(ty1-ty0);
   const line=tr.hours.map((hh,i)=>`${X(hh).toFixed(1)},${Y(tr.med[i]).toFixed(1)}`).join(' ');
   const band=tr.lo?`<path class="band" d="M${tr.hours.map((hh,i)=>`${X(hh).toFixed(1)},${Y(tr.hi[i]).toFixed(1)}`).join(' L')} L${[...tr.hours].reverse().map((hh,i)=>`${X(hh).toFixed(1)},${Y(tr.lo[tr.lo.length-1-i]).toFixed(1)}`).join(' L')} Z"/>`:'';
-  const zero=(lo<0&&hi>0)?`<line class="zero" x1="${L}" x2="${Wd-Rr}" y1="${Y(0)}" y2="${Y(0)}"/>`:'';
-  return `<p class="tt">Temperatura próximas horas · ${word}</p><div class="k5">${cells}</div><svg class="tc" viewBox="0 0 ${Wd} ${Hd}" role="img" aria-label="Tendencia de temperatura 24 horas"><line class="g" x1="${L}" x2="${Wd-Rr}" y1="${Y(hi)}" y2="${Y(hi)}"/><line class="g" x1="${L}" x2="${Wd-Rr}" y1="${Y(lo)}" y2="${Y(lo)}"/>${zero}<text x="0" y="${Y(hi)+4}">${hi}°</text><text x="0" y="${Y(lo)+4}">${lo}°</text>${band}<polyline class="ln" points="${line}"/>${[0,6,12,18,24].map(hh=>`<text x="${X(hh)}" y="${Hd-2}" text-anchor="${hh===0?'start':hh===24?'end':'middle'}">${hh?'+'+hh+' h':'ahora'}</text>`).join('')}</svg>`;
+  const zero=(lo<0&&hi>0)?`<line class="zero" x1="${L}" x2="${R}" y1="${Y(0)}" y2="${Y(0)}"/><text class="zt" x="${R}" y="${Y(0)-2}" text-anchor="end">0°</text>`:'';
+  const t0=Math.round(tr.med[0]);
+  const tlab=T.map(hh=>{ const v=at(hh), d=Math.round(v)-t0, x=X(hh), anc=hh===0?'start':hh===24?'end':'middle';
+    return `<circle cx="${x}" cy="${Y(v)}" r="2.6"/><text class="tv" x="${x}" y="${Y(v)-7}" text-anchor="${anc}">${fmtT(v)}${hh?`<tspan class="td"> ${d===0?'=':(d>0?'+':'−')+Math.abs(d)}</tspan>`:''}</text>`; }).join('');
+  // precipitación por tramos de 6 h (franja inferior)
+  const by0=92, by1=118, bl=w.blocks||[], pmax=Math.max(2,...bl.map(b=>b.med||0));
+  const bars=bl.map((b,i)=>{ const x0=X(i*6)+5, x1=X(i*6+6)-5, hgt=Math.max(b.med>0.05?2:0,(b.med/pmax)*(by1-by0)), cx=(x0+x1)/2;
+    return `<rect class="pb" x="${x0}" y="${by1-hgt}" width="${x1-x0}" height="${hgt}" rx="1.5"/><text class="pl" x="${cx}" y="${by1-hgt-3}" text-anchor="middle">${mm(b.med)} mm${b.prob!=null?` · ${b.prob}%`:''}</text>`; }).join('');
+  const ticks=T.map(hh=>`<line class="g" x1="${X(hh)}" x2="${X(hh)}" y1="${ty0-4}" y2="${by1}"/><text class="hl" x="${X(hh)}" y="${by1+12}" text-anchor="${hh===0?'start':hh===24?'end':'middle'}">${hh?'+'+hh+' h':'ahora'}</text><text class="hm" x="${X(hh)}" y="${by1+23}" text-anchor="${hh===0?'start':hh===24?'end':'middle'}">${hm(hh)}</text>`).join('');
+  // medianoche: línea discontinua para separar hoy y mañana
+  let mid='';
+  if(base){ const hrs=(24-(base.getHours()+base.getMinutes()/60))%24; if(hrs>0.3&&hrs<23.7){ const x=X(hrs); mid=`<line class="mid" x1="${x}" x2="${x}" y1="${ty0-14}" y2="${by1}"/><text class="midt" x="${x+3}" y="${ty0-8}">mañana</text>`; } }
+  return `<p class="tt">Próximas 24 h · temperatura ${word}</p>
+  <svg class="combo" viewBox="0 0 ${Wd} 146" role="img" aria-label="Temperatura y precipitación en las próximas 24 horas">
+    ${ticks}${mid}<line class="base" x1="${L}" x2="${R}" y1="${by1}" y2="${by1}"/>${zero}${band}<polyline class="ln" points="${line}"/>${tlab}${bars}
+  </svg>
+  <p class="legend"><i class="lt"></i>temperatura (mediana${tr.lo?', franja 10–90 %':''}) <i class="lp"></i>lluvia por tramo de 6 h${bl.some(b=>b.prob!=null)?' · prob. ≥1 mm':''}</p>`;
 }
 let wxAbort=null;
 async function liveWeather(s){
@@ -318,10 +348,10 @@ async function liveWeather(s){
     const ws=col('wind_speed_10m'), wd=col('wind_direction_10m'); let u=0,v=0; ws.forEach((sp,j)=>{ const rr=wd[j]*D2R; u-=sp*Math.sin(rr); v-=sp*Math.cos(rr); });
     const codes=col('weather_code'), cnt={}; codes.forEach(c=>cnt[c]=(cnt[c]||0)+1);
     const pk=keys('precipitation');
-    const pp=[6,12,18,24].map(hh=>{ const acc=pk.map(x=>h[x].slice(k,k+hh).reduce((a,b)=>a+(b||0),0)).sort((a,b)=>a-b); return [hh,Math.round(100*acc.filter(x=>x>=1).length/acc.length),acc[Math.floor(acc.length/2)],acc[Math.floor(.9*(acc.length-1))]]; });
+    const blocks=[0,1,2,3].map(i=>{ const acc=pk.map(x=>h[x].slice(k+i*6,k+i*6+6).reduce((a,b)=>a+(b||0),0)).sort((a,b)=>a-b); return {med:acc[Math.floor(acc.length/2)],prob:Math.round(100*acc.filter(x=>x>=1).length/acc.length)}; });
     const tk=keys('temperature_2m'), tr={hours:[],med:[],lo:[],hi:[],base:h.time[k]+'Z'};
     for(let o=0;o<=24&&k+o<h.time.length;o++){ const vals=tk.map(x=>h[x][k+o]).filter(x=>x!=null).sort((a,b)=>a-b); if(!vals.length) continue; tr.hours.push(o); tr.med.push(vals[Math.floor(vals.length/2)]); tr.lo.push(vals[Math.floor(.1*(vals.length-1))]); tr.hi.push(vals[Math.floor(.9*(vals.length-1))]); }
-    const w={t:med(col('temperature_2m')),ws:Math.round(med(ws)),wd:Math.round((Math.atan2(-u,-v)/D2R+360)%360),g:Math.round(med(col('wind_gusts_10m'))),p1:med(col('precipitation')),cloud:Math.round(med(col('cloud_cover'))),code:+Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]||0,pp,trend:tr};
+    const w={t:med(col('temperature_2m')),ws:Math.round(med(ws)),wd:Math.round((Math.atan2(-u,-v)/D2R+360)%360),g:Math.round(med(col('wind_gusts_10m'))),p1:med(col('precipitation')),cloud:Math.round(med(col('cloud_cover'))),code:+Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]||0,blocks,trend:tr};
     if(ctl.signal.aborted||sel!==s||!box()) return;
     box().innerHTML=wxHTML(w,`en directo · GEFS ${ws.length} miembros · ${fmtValid(h.time[k]+'Z')} · a ${Math.round(d.elevation)} m`);
   }catch(e){
