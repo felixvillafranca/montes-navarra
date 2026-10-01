@@ -25,7 +25,10 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--ground);color:va
 .card .k b{display:block;font:500 17px/1.1 var(--display);font-variant-numeric:tabular-nums}
 .card .k span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .card .x{position:absolute;top:6px;right:8px;appearance:none;border:0;background:none;color:var(--ink-3);font:300 22px/1 var(--body);width:30px;height:30px;cursor:pointer}
-.card{max-height:72vh;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.card{max-height:calc(100vh - 70px);max-height:calc(100dvh - 64px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:10px 14px 10px}
+.card h2{margin-bottom:4px}
+.card p{margin-top:6px}
+.wx{margin-top:8px;padding-top:8px;gap:8px}
 .card p{margin:8px 0 0;font-size:11px;color:var(--ink-3)}
 .wx{border-top:1px solid var(--line);margin-top:10px;padding-top:10px;display:grid;gap:10px}
 .wx .k b small,.k5 b small{font:400 10.5px/1 var(--body);color:var(--ink-2)}
